@@ -14,29 +14,47 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - finops-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    build: ./finops-gateway
+    container_name: finops-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - COST_API_URL=http://cost-api:8081
+      - ALERT_SERVICE_URL=http://alert-service:8082
+    depends_on:
+      - cost-api
+      - alert-service
+    networks:
+      - finops-network
 
   cost-api:
     build: ./finops-cost-api
     container_name: finops-cost-api
-    ports:
-      - "8080:8080"
     environment:
+      - SERVER_PORT=8081
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=finops
       - DB_USERNAME=postgres
       - DB_PASSWORD=postgres
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - finops-network
 
   cost-collector:
     build: ./finops-cost-collector
     container_name: finops-cost-collector
-    ports:
-      - "8082:8082"
     environment:
+      - SERVER_PORT=8083
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=finops
@@ -44,18 +62,17 @@ services:
       - DB_PASSWORD=postgres
       - AWS_REGION=ap-northeast-2
     depends_on:
-      - postgres
-      - cost-api
+      postgres:
+        condition: service_healthy
     networks:
       - finops-network
 
   alert-service:
     build: ./finops-alert-service
     container_name: finops-alert-service
-    ports:
-      - "8081:8081"
     environment:
-      - FEIGN_CLIENT_COST_API_URL=http://cost-api:8080
+      - SERVER_PORT=8082
+      - FEIGN_CLIENT_COST_API_URL=http://cost-api:8081
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
     depends_on:
       - cost-api
@@ -68,7 +85,7 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - cost-api
+      - gateway
     networks:
       - finops-network
 
