@@ -24,8 +24,9 @@ services:
     build: ./finops-gateway
     container_name: finops-gateway
     ports:
-      - "8080:8080"
+      - "8282:8282"
     environment:
+      - SERVER_PORT=8282
       - COST_API_URL=http://cost-api:8081
       - ALERT_SERVICE_URL=http://alert-service:8082
     depends_on:
